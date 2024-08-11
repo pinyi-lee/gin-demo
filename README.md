@@ -6,7 +6,7 @@ Use Docker to build and run FastAPI services.
 > Docker provides an isolated environment for running your application, ensuring consistent behavior regardless of local environment differences.
 
 #### build docker
-- make docker
+- make build_gin
 
 #### start service
 - make start

@@ -1,9 +1,42 @@
 version: '3.8'
 
 services:
+  gin_service:
+    image: gin_service
+    container_name: gin_service
+    ports:
+      - "9999:9999"
+    volumes:
+      - ../app:/app
+    environment:
+      GO_HTTP_PORT: 9999
+      LOG_LEVEL: INFO
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USERNAME: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DATABASE_NAME: postgres
+      REDIS_HOST: redis:6379
+      REDIS_PASSWORD: ""
+      REDIS_PREFIX: pinyi_
+      ELASTICSEARCH_INDEX_PREFIX : pinyi_
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      NATS_URL: nats://nats:4222
+      AWS_REGION: ap-northeast-1
+      AWS_S3_BUCKET: a-bucket-name
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - gin-network
+
   postgres:
     image: postgres:15
-    container_name: postgres
+    container_name: gin-app-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -12,24 +45,42 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    networks:
+      - gin-network
 
   redis:
     image: redis:latest
-    container_name: redis
+    container_name: gin-app-redis
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    networks:
+      - gin-network
 
   nats:
     image: nats:latest
-    container_name: nats
+    container_name: gin-app-nats
     ports:
       - "4222:4222"
       - "6222:6222"
       - "8222:8222"
+    networks:
+      - gin-network
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.5.3
-    container_name: elasticsearch
+    container_name: gin-app-elasticsearch
     environment:
       - discovery.type=single-node
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
@@ -40,9 +91,21 @@ services:
       - "9300:9300"
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s"]
+      interval: 30s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    networks:
+      - gin-network
 
 volumes:
   postgres_data:
     driver: local
   elasticsearch_data:
     driver: local
+
+networks:
+  gin-network:
+    driver: bridge

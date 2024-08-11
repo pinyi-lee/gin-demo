@@ -1,0 +1,19 @@
+FROM golang:1.21 as build_image
+
+WORKDIR /go${SOURCE_PATH}
+
+COPY ./ ./
+
+RUN go mod tidy -compat=1.21
+
+RUN CGO_ENABLED=0 go build -v -o myapp app/main/main.go
+
+RUN mv myapp /go/bin/app
+
+FROM gcr.io/distroless/base-debian12
+
+COPY --from=build_image --chown=root:root /go/bin/app /myapp
+
+EXPOSE 9999
+
+CMD ["/myapp"]
